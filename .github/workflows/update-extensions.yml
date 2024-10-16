@@ -31,3 +31,5 @@ jobs:
         git add extension_data.json
         git diff --quiet && git diff --staged --quiet || (git commit -m "Update extension data")
         git push https://${{ secrets.PAT }}@github.com/${{ github.repository }}.git
+      env:
+        PAT: ${{ secrets.PAT }}
