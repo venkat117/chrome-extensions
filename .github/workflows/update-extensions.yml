@@ -28,19 +28,31 @@ jobs:
           const fs = require("fs");
           const data = fs.readFileSync("raw_data.txt", "utf8").split("\n").filter(Boolean);
           const jsonData = data.map(line => {
-            const [id, name, version, category_slug, rating, rating_count, user_count, release_date, size, languages, ...descriptionParts] = line.split(" ");
+            const parts = line.split(" ");
+            const [id, name, version, category_slug, rating, rating_count, user_count, release_date, size] = parts.slice(0, 9);
+            const remainingParts = parts.slice(9);
+            let languages = [];
+            let description = "";
+            if (remainingParts.length > 0) {
+              if (remainingParts[0].includes(",")) {
+                languages = remainingParts[0].split(",");
+                description = remainingParts.slice(1).join(" ");
+              } else {
+                description = remainingParts.join(" ");
+              }
+            }
             return {
-              extension_id: id,
-              name: name,
-              version: version,
-              category_slug: category_slug,
-              rating: parseFloat(rating),
-              rating_count: parseInt(rating_count),
-              user_count: parseInt(user_count),
-              release_date: release_date,
-              size: size,
-              languages: languages.split(","),
-              description: descriptionParts.join(" ")
+              extension_id: id || null,
+              name: name || null,
+              version: version || null,
+              category_slug: category_slug || null,
+              rating: rating ? parseFloat(rating) : null,
+              rating_count: rating_count ? parseInt(rating_count) : null,
+              user_count: user_count ? parseInt(user_count) : null,
+              release_date: release_date || null,
+              size: size || null,
+              languages: languages,
+              description: description || null
             };
           });
           fs.writeFileSync("../extension_data.json", JSON.stringify(jsonData, null, 2));
