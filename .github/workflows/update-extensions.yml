@@ -10,22 +10,27 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
+
     - name: Set up Node.js
       uses: actions/setup-node@v2
       with:
         node-version: '14'
+
     - name: Clone chrome-extension-manifests-dataset
       run: git clone https://github.com/palant/chrome-extension-manifests-dataset.git
+
     - name: Install dependencies
       run: |
         cd chrome-extension-manifests-dataset
         npm install
+
     - name: Run query and update data
       run: |
         cd chrome-extension-manifests-dataset
         node query.js -o "id, metadata.name, manifest.version, metadata.category_slug, metadata.rating, metadata.rating_count, metadata.user_count, metadata.release_date, metadata.size, metadata.languages, metadata.description" true > raw_data.txt
         node -e '
           const fs = require("fs");
+          const zlib = require("zlib");
           const data = fs.readFileSync("raw_data.txt", "utf8").split("\n").filter(Boolean);
           const jsonData = data.map(line => {
             const parts = line.split(" ");
@@ -55,13 +60,16 @@ jobs:
               description: description || null
             };
           });
-          fs.writeFileSync("../extension_data.json", JSON.stringify(jsonData, null, 2));
+          const jsonString = JSON.stringify(jsonData);
+          const compressed = zlib.gzipSync(jsonString);
+          fs.writeFileSync("../extension_data.json.gz", compressed);
         '
+
     - name: Commit and push if changed
       run: |
         git config --global user.email "action@github.com"
         git config --global user.name "GitHub Action"
-        git add extension_data.json
+        git add extension_data.json.gz
         git diff --quiet && git diff --staged --quiet || (git commit -m "Update extension data")
         git push https://${{ secrets.PAT }}@github.com/${{ github.repository }}.git
       env:
