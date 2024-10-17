@@ -23,18 +23,24 @@ jobs:
     - name: Run query and update data
       run: |
         cd chrome-extension-manifests-dataset
-        node query.js -o "id, metadata.name, metadata.user_count, metadata.rating, manifest.version" true > raw_data.txt
+        node query.js -o "id, metadata.name, manifest.version, metadata.category_slug, metadata.rating, metadata.rating_count, metadata.user_count, metadata.release_date, metadata.size, metadata.languages, metadata.description" true > raw_data.txt
         node -e '
           const fs = require("fs");
           const data = fs.readFileSync("raw_data.txt", "utf8").split("\n").filter(Boolean);
           const jsonData = data.map(line => {
-            const [id, name, user_count, rating, version] = line.split(" ");
+            const [id, name, version, category_slug, rating, rating_count, user_count, release_date, size, languages, ...descriptionParts] = line.split(" ");
             return {
               extension_id: id,
               name: name,
-              user_count: parseInt(user_count),
+              version: version,
+              category_slug: category_slug,
               rating: parseFloat(rating),
-              version: version
+              rating_count: parseInt(rating_count),
+              user_count: parseInt(user_count),
+              release_date: release_date,
+              size: size,
+              languages: languages.split(","),
+              description: descriptionParts.join(" ")
             };
           });
           fs.writeFileSync("../extension_data.json", JSON.stringify(jsonData, null, 2));
