@@ -10,19 +10,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
-      with:
-        lfs: true
 
     - name: Set up Node.js
       uses: actions/setup-node@v2
       with:
         node-version: '14'
-
-    - name: Setup Git LFS
-      run: |
-        git lfs install
-        git lfs track "*.json"
-        git add .gitattributes
 
     - name: Clone chrome-extension-manifests-dataset
       run: git clone https://github.com/palant/chrome-extension-manifests-dataset.git
@@ -31,17 +23,28 @@ jobs:
       run: |
         cd chrome-extension-manifests-dataset
         npm install
-
     - name: Run query and update data
       run: |
         cd chrome-extension-manifests-dataset
         node query.js -o "id, metadata.name, manifest.version, metadata.category_slug, metadata.rating, metadata.rating_count, metadata.user_count, metadata.release_date, metadata.size, metadata.languages, metadata.description" true > raw_data.txt
         node -e '
           const fs = require("fs");
+          const zlib = require("zlib");
           const data = fs.readFileSync("raw_data.txt", "utf8").split("\n").filter(Boolean);
           const jsonData = data.map(line => {
-            const parts = line.split("\t");
-            const [id, name, version, category_slug, rating, rating_count, user_count, release_date, size, languages, ...descriptionParts] = parts;
+            const parts = line.split(" ");
+            const [id, name, version, category_slug, rating, rating_count, user_count, release_date, size] = parts.slice(0, 9);
+            const remainingParts = parts.slice(9);
+            let languages = [];
+            let description = "";
+            if (remainingParts.length > 0) {
+              if (remainingParts[0].includes(",")) {
+                languages = remainingParts[0].split(",");
+                description = remainingParts.slice(1).join(" ");
+              } else {
+                description = remainingParts.join(" ");
+              }
+            }
             return {
               extension_id: id || null,
               name: name || null,
@@ -52,18 +55,19 @@ jobs:
               user_count: user_count ? parseInt(user_count) : null,
               release_date: release_date || null,
               size: size || null,
-              languages: languages ? languages.split(",") : [],
-              description: descriptionParts.join("\t") || null
+              languages: languages,
+              description: description || null
             };
           });
-          fs.writeFileSync("../extension_data.json", JSON.stringify(jsonData, null, 2));
+          const jsonString = JSON.stringify(jsonData);
+          const compressed = zlib.gzipSync(jsonString);
+          fs.writeFileSync("../extension_data.json.gz", compressed);
         '
-
     - name: Commit and push if changed
       run: |
         git config --global user.email "action@github.com"
         git config --global user.name "GitHub Action"
-        git add extension_data.json
+        git add extension_data.json.gz
         git diff --quiet && git diff --staged --quiet || (git commit -m "Update extension data")
         git push https://${{ secrets.PAT }}@github.com/${{ github.repository }}.git
       env:
