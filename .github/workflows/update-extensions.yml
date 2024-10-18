@@ -1,95 +1,69 @@
-name: Update Extension Data
+- name: Run query and update data
+  run: |
+    cd chrome-extension-manifests-dataset
+    node query.js -o "id, metadata.name, manifest.version, metadata.category_slug, metadata.rating, metadata.rating_count, metadata.user_count, metadata.release_date, metadata.size, metadata.languages, metadata.description" true > raw_data.txt
+    node -e '
+      const fs = require("fs");
+      const zlib = require("zlib");
 
-on:
-  schedule:
-    - cron: '0 0 * * *'  # Runs daily at midnight UTC
-  workflow_dispatch:  # Allows manual triggering
+      try {
+        // Read and split data
+        const data = fs.readFileSync("raw_data.txt", "utf8").split("\n").filter(Boolean);
 
-jobs:
-  update-data:
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v2
+        // Map data into structured JSON
+        const jsonData = data.map(line => {
+          const parts = line.split(" ");
+          const [id, name, version, category_slug, rating, rating_count, user_count, release_date, size] = parts.slice(0, 9);
+          const remainingParts = parts.slice(9);
 
-    - name: Set up Node.js
-      uses: actions/setup-node@v2
-      with:
-        node-version: '14'
-
-    - name: Clone chrome-extension-manifests-dataset
-      run: git clone https://github.com/palant/chrome-extension-manifests-dataset.git
-
-    - name: Install dependencies
-      run: |
-        cd chrome-extension-manifests-dataset
-        npm install
-
-    - name: Run query and update data
-      run: |
-        cd chrome-extension-manifests-dataset
-        node query.js -o "id, metadata.name, manifest.version, metadata.category_slug, metadata.rating, metadata.rating_count, metadata.user_count, metadata.release_date, metadata.size, metadata.languages, metadata.description" true > raw_data.txt
-        node -e '
-          const fs = require("fs");
-          const zlib = require("zlib");
-
-          try {
-            // Read and split data from raw_data.txt
-            const data = fs.readFileSync("raw_data.txt", "utf8").split("\n").filter(Boolean);
-
-            // Map data into structured JSON
-            const jsonData = data.map(line => {
-              const parts = line.split(" ");
-              const [id, name, version, category_slug, rating, rating_count, user_count, release_date, size] = parts.slice(0, 9);
-              const remainingParts = parts.slice(9);
-
-              let languages = [];
-              let description = "";
-              if (remainingParts.length > 0) {
-                if (remainingParts[0].includes(",")) {
-                  languages = remainingParts[0].split(",");
-                  description = remainingParts.slice(1).join(" ");
-                } else {
-                  description = remainingParts.join(" ");
-                }
-              }
-
-              return {
-                extension_id: id || null,
-                name: name ? name.replace(/\"/g, '') : null,  // Remove quotes from names
-                version: version || null,
-                category_slug: category_slug || null,
-                rating: rating ? parseFloat(rating) : null,
-                rating_count: rating_count ? parseInt(rating_count) : null,
-                user_count: user_count ? parseInt(user_count) : null,
-                release_date: release_date || null,
-                size: size || null,
-                languages: languages,
-                description: description || null
-              };
-            });
-
-            // Validate JSON format
-            const jsonString = JSON.stringify(jsonData, null, 2);
-            console.log("JSON validation passed.");
-
-            // Compress the JSON data
-            const compressed = zlib.gzipSync(jsonString);
-
-            // Write the compressed JSON file
-            fs.writeFileSync("../extension_data.json.gz", compressed);
-            console.log("Data compressed and written successfully.");
-          } catch (error) {
-            console.error("Error processing the data:", error);
-            process.exit(1);  // Exit with failure code if something goes wrong
+          let languages = [];
+          let description = "";
+          if (remainingParts.length > 0) {
+            if (remainingParts[0].includes(",")) {
+              languages = remainingParts[0].split(",");
+              description = remainingParts.slice(1).join(" ");
+            } else {
+              description = remainingParts.join(" ");
+            }
           }
-        '
 
-    - name: Commit and push if changed
-      run: |
-        git config --global user.email "action@github.com"
-        git config --global user.name "GitHub Action"
-        git add ../extension_data.json.gz
-        git diff --quiet && git diff --staged --quiet || (git commit -m "Update extension data")
-        git push https://${{ secrets.PAT }}@github.com/${{ github.repository }}.git
-      env:
-        PAT: ${{ secrets.PAT }}
+          return {
+            extension_id: id || null,
+            name: name ? name.replace(/\"/g, '') : null,  // Handle quotes in names
+            version: version || null,
+            category_slug: category_slug || null,
+            rating: rating ? parseFloat(rating) : null,
+            rating_count: rating_count ? parseInt(rating_count) : null,
+            user_count: user_count ? parseInt(user_count) : null,
+            release_date: release_date || null,
+            size: size || null,
+            languages: languages,
+            description: description || null
+          };
+        });
+
+        // Validate JSON format
+        const jsonString = JSON.stringify(jsonData, null, 2);
+        console.log("JSON validation passed.");
+
+        // Compress the JSON data
+        const compressed = zlib.gzipSync(jsonString);
+
+        // Write the compressed file within the repo (ensure it is in the current repo directory)
+        fs.writeFileSync("./extension_data.json.gz", compressed);
+        console.log("Data compressed and written successfully.");
+      } catch (error) {
+        console.error("Error processing the data:", error);
+        process.exit(1);  // Exit with failure code if something goes wrong
+      }
+    '
+
+- name: Commit and push if changed
+  run: |
+    git config --global user.email "action@github.com"
+    git config --global user.name "GitHub Action"
+    git add ./extension_data.json.gz
+    git diff --quiet && git diff --staged --quiet || (git commit -m "Update extension data")
+    git push https://${{ secrets.PAT }}@github.com/${{ github.repository }}.git
+  env:
+    PAT: ${{ secrets.PAT }}
