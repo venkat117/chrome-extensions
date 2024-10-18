@@ -30,22 +30,10 @@ jobs:
         node query.js -o "id, metadata.name, manifest.version, metadata.category_slug, metadata.rating, metadata.rating_count, metadata.user_count, metadata.release_date, metadata.size, metadata.languages, metadata.description" true > raw_data.txt
         node -e '
           const fs = require("fs");
-          const zlib = require("zlib");
           const data = fs.readFileSync("raw_data.txt", "utf8").split("\n").filter(Boolean);
           const jsonData = data.map(line => {
-            const parts = line.split(" ");
-            const [id, name, version, category_slug, rating, rating_count, user_count, release_date, size] = parts.slice(0, 9);
-            const remainingParts = parts.slice(9);
-            let languages = [];
-            let description = "";
-            if (remainingParts.length > 0) {
-              if (remainingParts[0].includes(",")) {
-                languages = remainingParts[0].split(",");
-                description = remainingParts.slice(1).join(" ");
-              } else {
-                description = remainingParts.join(" ");
-              }
-            }
+            const parts = line.split("\t");  // Change delimiter to tab
+            const [id, name, version, category_slug, rating, rating_count, user_count, release_date, size, languages, ...descriptionParts] = parts;
             return {
               extension_id: id || null,
               name: name || null,
@@ -56,20 +44,18 @@ jobs:
               user_count: user_count ? parseInt(user_count) : null,
               release_date: release_date || null,
               size: size || null,
-              languages: languages,
-              description: description || null
+              languages: languages ? languages.split(",") : [],
+              description: descriptionParts.join("\t") || null
             };
           });
-          const jsonString = JSON.stringify(jsonData);
-          const compressed = zlib.gzipSync(jsonString);
-          fs.writeFileSync("../extension_data.json.gz", compressed);
+          fs.writeFileSync("../extension_data.json", JSON.stringify(jsonData, null, 2));
         '
 
     - name: Commit and push if changed
       run: |
         git config --global user.email "action@github.com"
         git config --global user.name "GitHub Action"
-        git add extension_data.json.gz
+        git add extension_data.json
         git diff --quiet && git diff --staged --quiet || (git commit -m "Update extension data")
         git push https://${{ secrets.PAT }}@github.com/${{ github.repository }}.git
       env:
