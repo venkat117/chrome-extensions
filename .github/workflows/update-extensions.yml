@@ -43,7 +43,7 @@ jobs:
       run: |
         git config --global user.email "action@github.com"
         git config --global user.name "GitHub Action"
-        git add extension_data.json
+        git add -A  # Stage all changes, including new and modified files
         git diff --quiet && git diff --staged --quiet || (git commit -m "Update extension data")
         git push https://${{ secrets.PAT }}@github.com/${{ github.repository }}.git
       env:
