@@ -37,7 +37,13 @@ jobs:
           
           // Map the data to CSV rows
           data.forEach(line => {
-            const [id, name, user_count, rating, version] = line.split(" ");
+            // Split by spaces, but only consider non-empty values for each field
+            const fields = line.split(/\s+/); // Regex to handle multiple spaces
+
+            // Ensure that each field has a valid value; if not, set as empty string
+            const [id = "", name = "", user_count = "", rating = "", version = ""] = fields;
+
+            // Join fields with commas and add to CSV data
             csvData.push([id, name, user_count, rating, version].join(","));
           });
           
