@@ -27,17 +27,22 @@ jobs:
         node -e '
           const fs = require("fs");
           const data = fs.readFileSync("raw_data.txt", "utf8").split("\n").filter(Boolean);
-          const jsonData = data.map(line => {
+          
+          // Create CSV header
+          const header = ["extension_id", "name", "user_count", "rating", "version"];
+          const csvData = [];
+          
+          // Add the header row
+          csvData.push(header.join(","));
+          
+          // Map the data to CSV rows
+          data.forEach(line => {
             const [id, name, user_count, rating, version] = line.split(" ");
-            return {
-              extension_id: id,
-              name: name,
-              user_count: parseInt(user_count),
-              rating: parseFloat(rating),
-              version: version
-            };
+            csvData.push([id, name, user_count, rating, version].join(","));
           });
-          fs.writeFileSync("../extension_data.json", JSON.stringify(jsonData, null, 2));
+          
+          // Write CSV to file
+          fs.writeFileSync("../extension_data.csv", csvData.join("\n"));
         '
     - name: Commit and push if changed
       run: |
