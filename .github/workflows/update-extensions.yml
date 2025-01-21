@@ -28,28 +28,35 @@ jobs:
           const fs = require("fs");
           const data = fs.readFileSync("raw_data.txt", "utf8").split("\n").filter(Boolean);
           
-          // Create CSV header
-          const header = ["extension_id", "name", "user_count", "rating", "version"];
-          const csvData = [];
-          
-          // Add the header row
-          csvData.push(header.join(","));
-          
-          // Map the data to CSV rows
-          data.forEach(line => {
-            // Split by spaces, but only consider non-empty values for each field
-            const fields = line.split(/\s+/); // Regex to handle multiple spaces
-
-            // Ensure that each field has a valid value; if not, set as empty string
+          // Convert raw data to JSON
+          const jsonData = data.map(line => {
+            const fields = line.split(/\s+/); // Split by one or more spaces
+            
+            // Destructure and assign empty strings for missing values
             const [id = "", name = "", user_count = "", rating = "", version = ""] = fields;
-
-            // Join fields with commas and add to CSV data
-            csvData.push([id, name, user_count, rating, version].join(","));
+            
+            // Return as JSON object
+            return {
+              extension_id: id,
+              name: name,
+              user_count: user_count,
+              rating: rating,
+              version: version
+            };
           });
+
+          // Write JSON data to file
+          fs.writeFileSync("../extension_data.json", JSON.stringify(jsonData, null, 2));
+
+          // Convert JSON data to CSV
+          const json2csv = require("json2csv").parse;
+          const csvData = json2csv(jsonData);
           
           // Write CSV to file
-          fs.writeFileSync("../extension_data.csv", csvData.join("\n"));
+          fs.writeFileSync("../extension_data.csv", csvData);
         '
+        # Install json2csv library (can be done in dependencies or this step)
+        npm install json2csv
     - name: Commit and push if changed
       run: |
         git config --global user.email "action@github.com"
