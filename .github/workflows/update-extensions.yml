@@ -20,6 +20,7 @@ jobs:
       run: |
         cd chrome-extension-manifests-dataset
         npm install
+        npm install json2csv
     - name: Run query and update data
       run: |
         cd chrome-extension-manifests-dataset
@@ -56,7 +57,7 @@ jobs:
           fs.writeFileSync("../extension_data.csv", csvData);
         '
         # Install json2csv library (can be done in dependencies or this step)
-        npm install json2csv
+       
     - name: Commit and push if changed
       run: |
         git config --global user.email "action@github.com"
